@@ -1,0 +1,7 @@
+{
+  "name": "Super Tappy Racing",
+  "description": "A fun and cute real-time racing battle game for kids! Race with friends, choose your favorite car, and climb the leaderboard.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
