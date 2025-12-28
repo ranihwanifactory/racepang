@@ -1,5 +1,8 @@
 
-export type CarType = 'red' | 'blue' | 'yellow' | 'green' | 'pink';
+export type CarType = 
+  | 'red_race' | 'blue_suv' | 'yellow_taxi' | 'green_tractor' | 'pink_ufo' 
+  | 'police' | 'ambulance' | 'firetruck' | 'monster_truck' | 'bus' 
+  | 'sport_white' | 'delivery_van' | 'kart' | 'classic_blue';
 
 export interface Player {
   uid: string;

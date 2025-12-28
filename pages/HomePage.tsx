@@ -14,9 +14,10 @@ const HomePage: React.FC = () => {
       </div>
 
       <div className="flex gap-4 justify-center items-end py-8">
-        <Car type="red" size="lg" isAnimated />
-        <Car type="yellow" size="md" className="opacity-80" isAnimated />
-        <Car type="blue" size="md" className="opacity-80" isAnimated />
+        {/* Fix: Use valid CarType values as defined in types.ts */}
+        <Car type="red_race" size="lg" isAnimated />
+        <Car type="yellow_taxi" size="md" className="opacity-80" isAnimated />
+        <Car type="blue_suv" size="md" className="opacity-80" isAnimated />
       </div>
 
       <div className="flex flex-col gap-4 w-full max-w-xs">

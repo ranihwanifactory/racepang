@@ -1,15 +1,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, push, set, onValue, get } from 'firebase/database';
+import { ref, set, onValue, get } from 'firebase/database';
 import { auth, database } from '../firebase';
-import { Plus, Play, Info } from 'lucide-react';
+import { Plus, Info } from 'lucide-react';
 import { Room, Player } from '../types';
 
 const LobbyPage: React.FC = () => {
   const navigate = useNavigate();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 초등학생들이 읽기 쉽도록 혼동되는 문자(I, 1, O, 0)를 제외한 4글자 코드 생성
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
 
   useEffect(() => {
     const roomsRef = ref(database, 'rooms');
@@ -33,11 +43,14 @@ const LobbyPage: React.FC = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const roomsRef = ref(database, 'rooms');
-    const newRoomRef = push(roomsRef);
-    const roomId = newRoomRef.key;
-
-    if (!roomId) return;
+    let roomId = generateRoomCode();
+    
+    // 중복 확인 (간단하게 1회 확인)
+    const existingRef = ref(database, `rooms/${roomId}`);
+    const snapshot = await get(existingRef);
+    if (snapshot.exists()) {
+      roomId = generateRoomCode(); // 중복 시 한 번 더 생성
+    }
 
     const initialRoom: Partial<Room> = {
       creatorId: user.uid,
@@ -46,14 +59,14 @@ const LobbyPage: React.FC = () => {
         [user.uid]: {
           uid: user.uid,
           name: user.displayName || '이름없음',
-          car: 'red',
+          car: 'red_race',
           progress: 0,
           isReady: false
         }
       }
     };
 
-    await set(newRoomRef, initialRoom);
+    await set(ref(database, `rooms/${roomId}`), initialRoom);
     navigate(`/room/${roomId}`);
   };
 
@@ -86,15 +99,14 @@ const LobbyPage: React.FC = () => {
             <div key={room.id} className="bg-white p-6 rounded-2xl shadow-md border-b-4 border-blue-200 flex items-center justify-between hover:scale-[1.02] transition-transform">
               <div>
                 <h3 className="text-xl font-bold text-gray-800 mb-1">
-                  {/* Fixed: cast Object.values(room.players) to Player[] to avoid 'unknown' type error */}
                   🏎️ {room.players ? (Object.values(room.players) as Player[])[0]?.name : '비공개'}의 레이싱룸
                 </h3>
                 <div className="flex items-center gap-4">
+                  <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold border border-yellow-200">
+                    코드: {room.id}
+                  </span>
                   <span className="text-sm bg-blue-100 text-blue-600 px-2 py-1 rounded-lg">
                     {Object.keys(room.players || {}).length}명 대기중
-                  </span>
-                  <span className={`text-sm px-2 py-1 rounded-lg ${room.status === 'waiting' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                    {room.status === 'waiting' ? '대기중' : '진행중'}
                   </span>
                 </div>
               </div>
@@ -117,8 +129,7 @@ const LobbyPage: React.FC = () => {
       <div className="mt-12 bg-white/60 p-4 rounded-xl flex items-start gap-3">
         <Info className="text-blue-500 flex-shrink-0" size={20} />
         <p className="text-sm text-blue-700">
-          초대 링크를 친구에게 공유하면 바로 게임에 들어올 수 있어요! 
-          우승을 많이 할수록 랭킹이 올라가요.
+          초대 링크를 친구에게 공유하거나, 4글자 코드를 알려주면 바로 게임에 들어올 수 있어요!
         </p>
       </div>
     </div>

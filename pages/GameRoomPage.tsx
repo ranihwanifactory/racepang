@@ -1,20 +1,24 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, set, update, get, remove } from 'firebase/database';
+import { ref, onValue, set, update, get } from 'firebase/database';
 import { auth, database } from '../firebase';
 import { Room, Player, CarType } from '../types';
 import Car from '../components/Car';
-import { Share2, ArrowLeft, Send } from 'lucide-react';
+import { Share2, ArrowLeft, Palette, Copy } from 'lucide-react';
 
 const GameRoomPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [room, setRoom] = useState<Room | null>(null);
   const [localPlayer, setLocalPlayer] = useState<Player | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Sound effects
+  const carOptions: CarType[] = [
+    'red_race', 'blue_suv', 'yellow_taxi', 'green_tractor', 'pink_ufo', 
+    'police', 'ambulance', 'firetruck', 'monster_truck', 'bus', 
+    'sport_white', 'delivery_van', 'kart', 'classic_blue'
+  ];
+
   const playSound = (type: 'click' | 'start' | 'win') => {
     const urls = {
       click: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
@@ -41,11 +45,10 @@ const GameRoomPage: React.FC = () => {
       if (currentPlayer) {
         setLocalPlayer(currentPlayer);
       } else if (data.status === 'waiting' && Object.keys(data.players || {}).length < 5) {
-        // Join if not already in players
         const joinPlayer: Player = {
           uid: auth.currentUser!.uid,
           name: auth.currentUser!.displayName || '이름없음',
-          car: 'red',
+          car: 'red_race',
           progress: 0,
           isReady: false
         };
@@ -72,7 +75,6 @@ const GameRoomPage: React.FC = () => {
 
   const startRace = async () => {
     if (!roomId) return;
-    // Fixed: cast Object.values to Player[] to resolve 'unknown' type errors
     const playersArr = Object.values(room?.players || {}) as Player[];
     if (playersArr.length < 2) {
       alert('최소 2명이 있어야 시작할 수 있어요!');
@@ -93,7 +95,6 @@ const GameRoomPage: React.FC = () => {
     
     const newProgress = Math.min((localPlayer?.progress || 0) + 2, 100);
     
-    // Check for win locally for immediate feedback
     if (newProgress >= 100 && room.status === 'racing') {
       playSound('win');
       finishRace(auth.currentUser.uid);
@@ -111,8 +112,6 @@ const GameRoomPage: React.FC = () => {
       winnerName: winner.name 
     });
 
-    // Update global stats
-    // Fixed: cast Object.values to Player[] to resolve 'unknown' type errors
     const playersArr = Object.values(room.players) as Player[];
     for (const p of playersArr) {
       const statsRef = ref(database, `stats/${p.uid}`);
@@ -134,53 +133,69 @@ const GameRoomPage: React.FC = () => {
   const copyInviteLink = () => {
     const link = `${window.location.origin}${window.location.pathname}#/room/${roomId}`;
     navigator.clipboard.writeText(link);
-    alert('초대 링크가 복사되었습니다! 친구에게 보내보세요.');
+    alert(`초대 링크와 방 코드(${roomId})가 복사되었습니다! 친구에게 알려주세요.`);
   };
 
   if (!room || !localPlayer) return null;
 
-  // Fixed: cast Object.values to Player[] to resolve 'unknown' type errors in the rest of the file
   const players = Object.values(room.players) as Player[];
 
   return (
-    <div className="flex flex-col h-full bg-blue-50 overflow-hidden">
-      {/* Header */}
-      <div className="bg-white p-4 border-b-2 border-blue-100 flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="text-gray-500 flex items-center gap-1">
+    <div className="flex flex-col h-full bg-blue-50 overflow-hidden font-['Jua']">
+      <div className="bg-white p-4 border-b-2 border-blue-100 flex items-center justify-between shadow-sm">
+        <button onClick={() => navigate('/')} className="text-gray-500 flex items-center gap-1 hover:text-blue-500 transition-colors">
           <ArrowLeft size={20} /> 나가기
         </button>
-        <div className="text-center">
+        <div className="flex flex-col items-center">
           <h2 className="font-bold text-lg text-blue-600">
-            {room.status === 'waiting' && '대기 중...'}
-            {room.status === 'racing' && '달려 달려! 🏃💨'}
-            {room.status === 'finished' && '경기 종료! 🎉'}
+            {room.status === 'waiting' && '대기실'}
+            {room.status === 'racing' && '경주 중!'}
+            {room.status === 'finished' && '경기 결과'}
           </h2>
+          {room.status === 'waiting' && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] text-gray-400 uppercase tracking-widest font-sans">Secret Code</span>
+              <div 
+                onClick={copyInviteLink}
+                className="bg-yellow-400 text-white px-3 py-0.5 rounded-full text-sm font-bold shadow-sm animate-bounce-slow cursor-pointer flex items-center gap-1"
+              >
+                {roomId} <Copy size={12} />
+              </div>
+            </div>
+          )}
         </div>
-        <button onClick={copyInviteLink} className="text-blue-500 bg-blue-50 px-3 py-1 rounded-lg flex items-center gap-1 font-bold">
-          <Share2 size={16} /> 초대
+        <button onClick={copyInviteLink} className="text-blue-500 bg-blue-50 px-3 py-1 rounded-lg flex items-center gap-1 font-bold border border-blue-100 hover:bg-blue-100 transition-all">
+          <Share2 size={16} /> 공유
         </button>
       </div>
 
       <div className="flex-1 p-4 relative overflow-y-auto">
         {room.status === 'waiting' ? (
           <div className="flex flex-col gap-6 items-center">
-            {/* Car Selection */}
+            {/* 초대 안내 영역 */}
+            <div className="bg-blue-600 text-white p-4 rounded-3xl w-full text-center shadow-lg border-b-4 border-blue-800">
+              <p className="text-sm opacity-90 mb-1 font-['Gaegu'] text-lg">친구야! 이 코드로 들어와!</p>
+              <p className="text-4xl font-black tracking-widest">{roomId}</p>
+            </div>
+
             <div className="w-full bg-white p-6 rounded-3xl shadow-lg border-2 border-yellow-200">
-              <h3 className="text-center font-bold text-yellow-600 mb-4 text-xl">내 자동차 고르기</h3>
-              <div className="flex justify-around gap-2">
-                {(['red', 'blue', 'yellow', 'green', 'pink'] as CarType[]).map(type => (
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Palette className="text-yellow-600" size={24} />
+                <h3 className="text-center font-bold text-yellow-600 text-xl">내 자동차 고르기</h3>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 max-h-48 overflow-y-auto p-2">
+                {carOptions.map(type => (
                   <button 
                     key={type}
                     onClick={() => selectCar(type)}
-                    className={`p-4 rounded-2xl transition-all ${localPlayer.car === type ? 'bg-yellow-100 ring-4 ring-yellow-400 scale-110' : 'bg-gray-50 hover:bg-gray-100'}`}
+                    className={`p-3 rounded-2xl transition-all flex items-center justify-center ${localPlayer.car === type ? 'bg-yellow-100 ring-4 ring-yellow-400 scale-105' : 'bg-gray-50 hover:bg-gray-100'}`}
                   >
-                    <Car type={type} size="md" />
+                    <Car type={type} size="sm" />
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Players List */}
             <div className="w-full space-y-3">
               <h3 className="font-bold text-gray-700 ml-2">참가 선수 ({players.length}/5)</h3>
               {players.map(p => (
@@ -196,7 +211,6 @@ const GameRoomPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Action Button */}
             <div className="w-full mt-4 space-y-4">
               <button 
                 onClick={toggleReady}
@@ -221,9 +235,7 @@ const GameRoomPage: React.FC = () => {
           </div>
         ) : room.status === 'racing' ? (
           <div className="h-full flex flex-col">
-            {/* Track */}
             <div className="flex-1 bg-gray-100 rounded-3xl p-4 flex flex-col justify-around gap-4 relative overflow-hidden">
-               {/* Finish Line UI */}
                <div className="absolute right-12 top-0 bottom-0 w-2 bg-white flex flex-col border-x-2 border-gray-300">
                   {Array.from({length: 20}).map((_, i) => (
                     <div key={i} className={`h-4 w-full ${i % 2 === 0 ? 'bg-black' : 'bg-white'}`}></div>
@@ -245,7 +257,6 @@ const GameRoomPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Tap Area */}
             <div className="h-64 mt-4 relative">
               <button 
                 onMouseDown={handleTap}
@@ -261,12 +272,12 @@ const GameRoomPage: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-full p-8 bg-white rounded-3xl shadow-xl border-4 border-yellow-400">
             <h2 className="text-4xl font-bold text-yellow-600 mb-2">경기 결과!</h2>
             <div className="text-8xl mb-6">🏆</div>
-            <p className="text-3xl font-bold text-blue-600 mb-8">
+            <p className="text-3xl font-bold text-blue-600 mb-8 text-center">
               <span className="text-yellow-500">[{room.winnerName}]</span> 님이 우승했어요!
             </p>
             
             <div className="w-full space-y-4 mb-8">
-              {players.sort((a,b) => b.progress - a.progress).map((p, idx) => (
+              {(Object.values(room.players) as Player[]).sort((a,b) => b.progress - a.progress).map((p, idx) => (
                 <div key={p.uid} className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl">
                   <div className="flex items-center gap-4">
                     <span className="text-xl font-bold text-blue-400">#{idx + 1}</span>
